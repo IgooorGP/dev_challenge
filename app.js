@@ -1,326 +1,84 @@
-var csv = require("fast-csv"),
-    headers = [],
-    isHeaders = true;
-
-class Student {
-    constructor(fullname, eid, classes, addresses, invisible, see_all) {
-        this.fullname = fullname;
-        this.eid = eid;
-        this.classes = classes;
-        this.addresses = addresses;
-        this.invisible = invisible;
-        this.see_all = see_all;
-    }
-}
-
-class Address {
-    constructor(type, tags, address) {
-        this.type = type;
-        this.tags = tags;
-        this.address = address;
-    }
-}
-
-
 /**
-* Takes an array of csv headers and an array of csv inputs and combines the two 'class'
-* columns into one. Also, it splits class inputs that are separated by commands or slashes
-* in the same row field.
+* Dev Challenge: parsing CSV with nodeJS.
 *
-* @param csvHeaders is an array that holds the header names of the csv input.
-* @param csvRow is an array that holds the values of each row of the csv input.
-*
-* @return classes is an array that holds all the classes for a given csv row.
-*/
-function cleanClasses(csvHeaders, csvRow) {
-    var classes = [],
-        seps = [",", "/"]; // separators used to split classes
+* @author Igor G.P.
+* @date 07/02/2018
+*/ 
 
-    // traverses the csv headers
-    csvHeaders.forEach(function(hdr, i) {
-        // finds the class header which may or not be split
-        if (hdr === 'class') {
-            var csvClass = csvRow[i], // finds the class position in the row array
-                hasSep = false;       // bool to check if a class requires spliting or no
-            
-            // checks if the seperators are in the class
-            seps.forEach(function(sep) {
-                // if the csv class has one of the seps, it must be split
-                if (csvClass.search(sep) != -1) {
-                    hasSep = true;
+var Student  = require("./classes/Student.js"),       // Student class
+    Address  = require("./classes/Address.js"),       // Address class
+    aux      = require("./functions/functions.js"),   // aux module with helper functions
+    csv      = require("fast-csv"),                   // module to read csv row by row
+    isHeaders = true,
+    students = [],
+    headers = [];
 
-                    // splits csvClass and pushes each individual class to the classes array
-                    csvClass.split(sep).forEach(function(individualClass) {
-                        classes.push(individualClass.trim());
-                    });
-                } 
-            });
-
-            // if the csv class has no separators it can be pushed directly (i.e. its an individual one)
-            if (!hasSep && csvClass !== "") {
-                classes.push(csvClass.trim());
-            }
-        }
-    });
-                    
-    return classes;
-}
-
-/**
-* Takes an array of headers and an array of the inputs of each row and transforms
-* into an object in which the keys are the header names and the values are
-* the inputs of the row.
-*
-* @param csvHeaders is an array that holds the header names of the csv input.
-* @param csvRow is an array that holds the values of each row of the csv input.
-*
-* @return row an object whose keys are the header names and the values are the row inputs.
-*/
-function getRow(csvHeaders, csvRow) {
-    var row = {};
-
-    for (var i = 0; i < csvHeaders.length; i++) {
-        if (csvHeaders[i] != 'class') {
-            // sets the headers as the keys
-            // sets the row inputs as the values
-            row[csvHeaders[i]] = csvRow[i];
-        }        
-    }
-
-    // transforms the two class column into one
-    // splits class values that are separated by commas or slashes
-    row['classes'] = cleanClasses(csvHeaders, csvRow);
+// reads line after line of the csv (begins at the headers)
+csv.fromPath("input.csv").on("data", function(data) {
     
-    return row;
-}
-
-/**
-* Takes an array of email tags and and array of email inputs of the csv
-* file to create an array of Address objects. Validates phone numbers.
-*
-* @param tagList is an array of the tags of the email field of the csv input.
-* @param csvEmail is the email value in each row of the csv input.
-*
-* @return addresses is an array of Address objects that were created with the email inputs.
-*/
-function getEmailAddresses(tagList, csvEmail) {
-    var splitEmails = [],
-        addresses = [];
-
-    // checks if the csv email contains a slash to hold many emails in one field
-    if (csvEmail.search("/") != -1) {
+    if (isHeaders) { // reads the headers of the csv
         
-        // splits the emails at the slash and pushes each one to the splitEmails array
-        csvEmail.split("/").map(s => s.trim()).forEach(function(email) {
-            splitEmails.push(email);
-        });
+        headers = data;
+        isHeaders = false;
         
-    } else {
-        // if the csv email has no slash it is pushed right away into splitEmails
-        splitEmails.push(csvEmail);
+    } else { // reads row after row of the csv
+        
+        var row = aux.getRow(headers, data),       // gets rows in an object whose keys are header names and values are row inputs
+            rowAddresses = aux.getAddress(row),    // parses all addresses of a row
+            invisible = aux.getInvisible(row),     // parses the invisible property
+            see_all = aux.getSeeAll(row);          // parses the see_all property
+        
+        // creates a new student object for each row which will be JOINED later (same student can appear in more than 1 row)
+        // pushes each new object into an array of students
+        students.push(new Student(row['fullname'], row['eid'], row['classes'], rowAddresses, invisible, see_all));
     }
-
-    // validates each csv email in splitEmails
-    splitEmails.forEach(function(email) {
-
-        // creates an email Address object and pushes to the address array
-        if (isValidEmail(email)) {            
-            addresses.push(new Address("email", tagList, email));
-        }
-    });
-
-    // returns an array with Address objects for valid emails
-    return addresses;
-}
-
-/**
-* Takes a string with an email value and returns whether it is a valid one or not. Taken
-* from a StackOverFlow question.
-*
-* @param email is a string with email value.
-*
-* @return true if the email is valid. Otherwise, returns false.
-*/
-function isValidEmail(email) {
-    // regexp pattern to look for valid emails
-    var re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
     
-    return re.test(String(email).toLowerCase());
-}
+}).on("end", function() { 
 
-/**
-* Takes an array of phone tags and and array of phone inputs of the csv
-* file to create an array of Address objects. Validates phone numbers.
-*
-* @param tagList is an array of the tags of the phone field of the csv input.
-* @param csvPhone is the phone value in each row of the csv input.
-*
-* @return addresses is an array of Address objects that were created with the phone inputs.
-*/
-function getPhoneAddresses(tagList, csvPhone) {
-    // requires google library
-    const phoneUtil = require("google-libphonenumber").PhoneNumberUtil.getInstance();
-    var addresses = [];
+    // promise --> after csv reading is over, time to JOIN the same students that appear in different rows
+    var studentsToJoin = {},      // hash for checking for students that appear in more than one row
+        studentsJSON   = [];      // array with final JSON results
 
-    try {
-        // parses number with country code and keep raw input
-        const number = phoneUtil.parseAndKeepRawInput(csvPhone, "BR");
+    // traverses students objects that were created from parsing the CSV
+    students.forEach(function(student) {
 
-        // checks if the phone number is valid
-        if (phoneUtil.isPossibleNumber(number)) {
+        // if its a new student (not yet JOINED) with its other row objects
+        if (!studentsToJoin.hasOwnProperty(student.eid)) {
 
-            // pushes a new phone Address object with the valid phone number (right format)
-            addresses.push(new Address("phone", tagList,
-                                       number.getCountryCode().toString() +
-                                       number.getNationalNumber().toString()));
-
-            return addresses;
-        } else {
-            // returns an empty array if no valid phone numbers were found
-            return [];
-        }
-
-    } catch (NOT_A_NUMBER) {
-        // returns an empty array if an invalid phone number threw NOT_A_NUMBER exception
-        return [];
-    }
-
-}
-
-/**
-* Takes a row object and searches the headers names for address and tags information.
-*
-* @param row is an object whose keys are column names and values are the row inputs of the csv file.
-*
-* @return addresses an array that holds Address objects.
-*/
-function getAddress(row) {
-    var keywords       = ["phone", "email"], 
-        allAddresses   = [],
-        emailAddresses = [],
-        phoneAddresses = [];
-
-    // traverses keys of the row object (headers/column names)
-    Object.keys(row).forEach(function(headerName) {
-
-        // checks if keywords (phone/email) are substrings in the headerName
-        keywords.forEach(function(keyword) {
+            // adds student.eid as the key and the student as the value
+            studentsToJoin[student.eid] = student; 
             
-            if (headerName.search(keyword) != -1) {
+        } else { 
+            // if student.eid is already in the hash, it means the same student has another row result
 
-                // removes keyword (phone/email) to obtain a string with the tags
-                var tagListString = headerName.replace(keyword, "").trim(),
-                    tagList       = tagListString.split(",").map(s => s.trim());
+            // updates (mutates) student in the hash to concat new classes
+            studentsToJoin[student.eid].classes = studentsToJoin[student.eid].classes.concat(student.classes);
 
-                if (keyword == 'email') {
-                    // emailAddresses = cleanEmail(new Address(keyword, tagList, row[headerName]));
-                    
-                    // validates the email
-                    emailAddresses = getEmailAddresses(tagList, row[headerName]);
+            // updates (mutates) student in the hash to concat new addresses
+            studentsToJoin[student.eid].addresses = studentsToJoin[student.eid].addresses.concat(student.addresses);
 
-                    // concatenates the array of email addresses into the addresses array found for this headerName
-                    allAddresses = allAddresses.concat(emailAddresses);
-                } else {
-                    // validates the phone number
-                    phoneAddresses = getPhoneAddresses(tagList, row[headerName]);
+            // changes see_all property if at least one student value was 1
+            if (student.invisible === true) {
+                studentsToJoin[student.eid].invisible = true;
+            }
 
-                    // concatenates the array of phone addresses into the addresses array
-                    allAddresses = allAddresses.concat(phoneAddresses);
-                }                
+            // changes see_all property if at least one student value was 1
+            if (student.see_all === true) {
+                studentsToJoin[student.eid].see_all = true;
             }
             
-        });
+        }
         
     });
-    
-    return allAddresses;
-}
 
-/**
-* Transforms the invisible field of the csv input into true or false.
-*
-* @param row is an object whose keys are column names and values are the row inputs of the csv file.
-*
-* @return true if invisible is one. Otherwise, returns false.
-*/
-function getInvisible(row) {
-    if (parseInt(row['invisible'] ) === 1) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-/**
-* Transforms the see_all field of the csv input into true or false.
-*
-* @param row is an object whose keys are column names and values are the row inputs of the csv file.
-*
-* @return true if see_all is one. Otherwise, returns false.
-*/
-function getSeeAll(row) {
-    if (row['see_all'] === 'yes') {
-        return true
-    } else {
-        return false;
-    }
-}
-
-var students = [];
-
-csv.fromPath("input.csv")
-    .on("data", function(data){
-        if (isHeaders) {
-            headers = data;
-
-            isHeaders = false;
-        } else {
-            var row = getRow(headers, data),
-                rowAddresses = getAddress(row),
-                invisible = getInvisible(row),
-                see_all = getSeeAll(row);
-            
-            students.push(new Student(row['fullname'], row['eid'], row['classes'], rowAddresses, invisible, see_all));
-
-//            console.log(JSON.stringify(new Student(row['fullname'], row['eid'], row['classes'], rowAddresses, invisible, see_all)));
+    // traverses the student hash (object) to get all updated (JOINED) students
+    for (var eid in studentsToJoin) {
+        if (studentsToJoin.hasOwnProperty(eid)) {
+            // pushes JOINED student to the final array
+            studentsJSON.push(studentsToJoin[eid]);
         }
+    }
 
-    })
-    .on("end", function(){
-        console.log("done");       
-        var eids = {};
-        
-        students.forEach(function(student) {
-            
-            if (!eids.hasOwnProperty(student.eid)) {
-                eids[student.eid] = student;
-            } else {
-                // already found that eid --> must group student properties
-                // var previousRegister = eids[student.eid];
-                
-                eids[student.eid].classes = eids[student.eid].classes.concat(student.classes);
-                eids[student.eid].addresses = eids[student.eid].addresses.concat(student.addresses);
-
-                if (student.invisible === true) {
-                    eids[student.eid].invisible = true;
-                }
-
-                if (student.see_all === true) {
-                    eids[student.eid].see_all = true;
-                }
-                   
-            }
-        });
-
-        var studentsJSON = [];
-        
-        for (var key in eids) {
-            if (eids.hasOwnProperty(key)) {
-                studentsJSON.push(eids[key]);
-            }
-        }
-
-        console.log(JSON.stringify(studentsJSON));
-    });
-
-
+    // prints the final JSON
+    console.log(JSON.stringify(studentsJSON));
+});

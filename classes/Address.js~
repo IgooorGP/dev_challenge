@@ -1,0 +1,9 @@
+class Address {
+    constructor(type, tags, address) {
+        this.type = type;
+        this.tags = tags;
+        this.address = address;
+    }
+}
+
+module.exports = Address;
