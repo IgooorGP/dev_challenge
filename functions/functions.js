@@ -15,20 +15,20 @@ function cleanClasses(csvHeaders, csvRow) {
         seps = [",", "/"]; // separators used to split classes
 
     // traverses the csv headers
-    csvHeaders.forEach(function(hdr, i) {
+    csvHeaders.forEach( (hdr, i) => {
         // finds the class header which may or not be split
         if (hdr === 'class') {
             var csvClass = csvRow[i], // finds the class position in the row array
                 hasSep = false;       // bool to check if a class requires spliting or no
             
             // checks if the seperators are in the class
-            seps.forEach(function(sep) {
+            seps.forEach( sep => {
                 // if the csv class has one of the seps, it must be split
                 if (csvClass.search(sep) != -1) {
                     hasSep = true;
 
                     // splits csvClass and pushes each individual class to the classes array
-                    csvClass.split(sep).forEach(function(individualClass) {
+                    csvClass.split(sep).forEach( individualClass => {
                         classes.push(individualClass.trim());
                     });
                 } 
@@ -89,22 +89,23 @@ function getEmailAddresses(tagList, csvEmail) {
     if (csvEmail.search("/") != -1) {
         
         // splits the emails at the slash and pushes each one to the splitEmails array
-        csvEmail.split("/").map(s => s.trim()).forEach(function(email) {
+        csvEmail.split("/").map(s => s.trim()).forEach( email => {
             splitEmails.push(email);
         });
         
     } else {
-        // if the csv email has no slash it is pushed right away into splitEmails
+        // if the csv email has no slash it is pushed right away into splitEmails list
         splitEmails.push(csvEmail);
     }
 
     // validates each csv email in splitEmails
-    splitEmails.forEach(function(email) {
+    splitEmails.forEach( email => {
 
         // creates an email Address object and pushes to the address array
         if (isValidEmail(email)) {            
             addresses.push(new Address("email", tagList, email));
         }
+        
     });
 
     // returns an array with Address objects for valid emails
@@ -170,7 +171,7 @@ function getPhoneAddresses(tagList, csvPhone) {
 *
 * @param row is an object whose keys are column names and values are the row inputs of the csv file.
 *
-* @return addresses an array that holds Address objects.
+* @return addresses an array that holds Address objects (type phone and email).
 */
 function getAddress(row) {
     var keywords       = ["phone", "email"], 
@@ -178,21 +179,21 @@ function getAddress(row) {
         emailAddresses = [],
         phoneAddresses = [];
 
-    // traverses keys of the row object (headers/column names)
-    Object.keys(row).forEach(function(headerName) {
+    // traverses keys (column names) of the row object
+    Object.keys(row).forEach( headerName => {
 
-        // checks if keywords (phone/email) are substrings in the headerName
-        keywords.forEach(function(keyword) {
+        // checks if keywords (phone/email) are substrings of the column name = requires tag extraction
+        keywords.forEach( keyword => {
             
             if (headerName.search(keyword) != -1) {
 
                 // removes keyword (phone/email) to obtain a string with the tags
-                var tagListString = headerName.replace(keyword, "").trim(),
-                    tagList       = tagListString.split(",").map(s => s.trim());
+                let tagListString = headerName.replace(keyword, "").trim();
+                
+                // splits the string with the tags and trims whitespaces
+                let tagList       = tagListString.split(",").map(s => s.trim());
 
-                if (keyword == 'email') {
-                    // emailAddresses = cleanEmail(new Address(keyword, tagList, row[headerName]));
-                    
+                if (keyword == 'email') {                    
                     // validates the email
                     emailAddresses = getEmailAddresses(tagList, row[headerName]);
 
